@@ -1,357 +1,150 @@
-﻿; =================================================================================
-; =================================================================================
-; =================================================================================
-; Schedule Power Event
-; =================================================================================
-; ====== by: Derek Nelson ===== 2023 ==============================================
-; =================================================================================
-; HOTKEYS (#IfWinActive): d, e, h, m, r, s, t, w, x, z, {ENTER}, {ESCAPE}
-
-;fp1 steal win-spy drag'n'drop thingy for WINDOW EVENT
-;fp2 populate 'DelayValue' EDIT field with ListView selection or FindTool (real-time) selection
-;fp3 write in code for EXE/WINDOW EVENTS into the ENTER hotkey area
-;fp4 tweak countdown box to show remaining days, hours, minutes, and seconds (as necessary)
-
-
-;;;;;;;;;;;;;;;;;;;;
-;;; SETUP
-;;;;;;;;;;;;;;;;;;;;
-
-#NoEnv
-#SingleInstance, Force
+#Requires AutoHotkey v2+ 64-bit
 #NoTrayIcon
-SetTitleMatchMode, 3 ; exact matches only
-#IfWinActive, Schedule Power Event
+#SingleInstance Force ; forces a single instance of this script
+#Warn All, Off
 
-; images
-ResDir:= "E:\Downloads\!! STUFF !!\WinSpy\Resources"
-Bitmap1:= ResDir . "\FindTool1.bmp"
-Bitmap2:= ResDir . "\FindTool2.bmp"
-hCrossHair:= DllCall("LoadImage", Int, 0, Str, ResDir . "\CrossHair.cur", Int, 2, Int, 32, "Int", 32, UInt, 0x10) ; LR_LOADFROMFILE
-VarSetCapacity(AndMask, 32*4, 0xFF), VarSetCapacity(XorMask, 32*4, 0) ; Setup a blank icon
-hIcon:= DllCall("CreateCursor", Uint,0, Int,0, Int,0, Int,32, Int,32, Uint,&AndMask, Uint,&XorMask) ; Setup a blank icon
-
-; variable optimization
-dtit:= "[3] CHOOSE "
-dtit1:= dtit . "DELAY AMOUNT:"
-rd:= " +Redraw"
-btxt:= "+cBlack" . rd
-ptxt:= "+cPurple" . rd
-rtxt:= "+cRed" . rd
-ytxt:= "+cYellow" . rd
-
-; default text blinking at GUI creation
-BlinkEvent:= 3 ; SLEEP blink
-BlinkDelay:= 4 ; SECONDS blink
-EVENT_TYPE:= "Z" ; SLEEP
+; Setup
+SetPowerPrivilege() ; Enable SeShutdownPrivilege
 
 
-;;;;;;;;;;;;;;;;;;;;
-;;; MAIN BODY
-;;;;;;;;;;;;;;;;;;;;
+; Create Main GUI
+myGui:= Gui("+AlwaysOnTop +Border +ToolWindow", SubStr(A_ScriptName, 1, -4))
+myGui.BackColor:= "Black"
+myGui.SetFont("Bold cRed")
+myGui.OnEvent("Close", (*) => ExitApp())
+myGui.OnEvent("Escape", (*) => ExitApp())
 
-Gui Color, Black, Black
-Gui Margin, 0, 15
-Gui Font, Bold s12 cPurple, Hermit
-	Gui Add, Text, Center cLime x0 y0 w300					, ___________________________
-	Gui Add, Text, Center cRed x0 y+9 w300					, !! SCHEDULE POWER EVENT !!
-	Gui Add, Text, Center cLime x0 y+-6 w300				, ___________________________
-Gui Add, GroupBox, Section cLime x15 y+9 h122 w270			, [1] CHOOSE POWER EVENT:
-	Gui Add, Text, vbt1 cBlack x25 ys+25					, ►►
-	Gui Add, Text, vt1 x+10								, (R) RESTART
-	Gui Add, Text, vbt2 cBlack x25 y+						, ►►
-	Gui Add, Text, vt2 x+10								, (T) SHUTDOWN
-	Gui Add, Text, vbt3 cBlack x25 y+						, ►►
-	Gui Add, Text, vt3 cYellow x+10						, (Z) SLEEP
-	Gui Add, Text, Section cRed x55 y+						, (X) EXIT
-	Gui Font, s10
-	Gui Add, Text, cRed x+30 y+-21						, (Esc) Reload
-	Gui Font, s12
-Gui Add, GroupBox, Section cLime x15 ys+42 h168 w270			, [2] CHOOSE WAITING TYPE:
-	Gui Add, Text, vbt4 cBlack x25 ys+25					, ►►
-	Gui Add, Text, vt4 cYellow x+10						, (S) SECONDS
-	Gui Add, Text, vbt5 cBlack x25 y+						, ►►
-	Gui Add, Text, vt5 x+10								, (M) MINUTES
-	Gui Add, Text, vbt6 cBlack x25 y+						, ►►
-	Gui Add, Text, vt6 x+10								, (H) HOURS
-	Gui Add, Text, vbt7 cBlack x25 y+						, ►►
-	Gui Add, Text, vt7 x+10								, (D) DAYS
-	Gui Add, Text, vbt8 cBlack x25 y+						, ►►
-	Gui Add, Text, vt8 x+10								, (E) EXE TERMINATION
-	Gui Add, Text, vbt9 cBlack x25 y+						, ►►
-	Gui Add, Text, vt9 x+10								, (W) WINDOW CLOSURE
-Gui Add, GroupBox, vDelayTitle Section cLime x15 y+19 h90 w270	, % dtit1
-	Gui Add, Edit, gEditMod hwndhEDIT vDelayValue Center Number cYellow x25 ys+30 h25 w250 ; <<<===@@@ DelayValue EDIT field here
-	Gui Add, Text, vbt10 Center Section cBlack y+7 w250
-Gui Font, s10
-	Gui Add, ListView, gLVMod vEXElv AltSubmit Grid +Hidden -Multi R6 BackgroundWhite cBlack x15 ys+42 w270, PID|Process
-	Gui Add, Picture, gFindToolHandler vFINDtl Border +Hidden x30 ys+42 h28 w31, %Bitmap1%
-	Gui Add, Text, vFINDtx +Hidden cLime x+15 y+-33, Drag && drop this onto`na window to select it
-Gui -Caption +hwndhSPE +LastFound +Owner -SysMenu ; Removes titlebar (and buttons), taskbar icon, and preps for blanking the alt-tab icon
-SendMessage, 0x80, 1, hIcon ; Call blank icon
-Gui Show, AutoSize Center, Schedule Power Event
+myGui.AddGroupBox("Section w250 h55", "Power State:")
+myGui.AddButton("vPS2 xs+10 ys+20 w55 Center Disabled", "&SLEEP").OnEvent("Click", HandleButton)
+myGui.AddButton("vPS1 xp+65 yp w85 Center", "SH&UTDOWN").OnEvent("Click", HandleButton)
+myGui.AddButton("vPS4 xp+95 yp w70 Center", "&RESTART").OnEvent("Click", HandleButton)
 
-; FindTool stuff
-OnMessage(0x200, "OnWM_MOUSEMOVE")
-OnMessage(0x202, "OnWM_LBUTTONUP")
-; no return here!! go directly into the Blink timer below.
+myGui.AddGroupBox("Section xs w250 h118", "Wait Type:")
+myGui.AddButton("vWT1000 xs+40 ys+20 w80 Center Disabled", "S&econds").OnEvent("Click", HandleButton)
+myGui.AddButton("vWT60000 xp+90 yp w80 Center", "&Minutes").OnEvent("Click", HandleButton)
+myGui.AddButton("vWT3600000 xs+40 yp+32 w80 Center", "&Hours").OnEvent("Click", HandleButton)
+myGui.AddButton("vWT86400000 xp+90 yp w80 Center", "&Days").OnEvent("Click", HandleButton)
+myGui.AddButton("vWTP xs+40 yp+32 w170 Center", "&PARTICULAR  DATE-TIME").OnEvent("Click", HandleButton)
+
+myGui.AddGroupBox("Section xs w250 h55", "Wait Amount:")
+myEDIT:= myGui.AddEdit("vWA1 xs+40 ys+20 w170 Center Number")
+myDT:= myGui.AddDateTime("vWA2 xs+40 ys+20 w170 Hidden 1 Range" A_Now, "   yyyy/MM/dd       HH:mm:ss")
+
+myGui.AddButton("xp y+25 w170 Center Default", "─→   ENTER   ←─").OnEvent("Click", SubmitGui)
 
 
-;;;;;;;;;;;;;;;;;;;;
-;;; LABELS / SUBS
-;;;;;;;;;;;;;;;;;;;;
+; Show GUI
+myGui.Show()
+myEDIT.Focus()
+Return
 
-Blink:
-	yblink:= (toggle:= !toggle) ? ytxt : btxt ; toggle yellow & black
-	rblink:= (toggle) ? rtxt : btxt ; toggle red & black
-	Loop, 10 {
-		if (A_Index <= 3)
-			GuiControl, % (BlinkEvent = A_Index) ? yblink : btxt, bt%A_Index%
-		else if (A_Index <= 9)
-			GuiControl, % (BlinkDelay = A_Index) ? yblink : btxt, bt%A_Index%
-		else {
-			GuiControl,, bt%A_Index%, % (BlinkCommit)
-			? "►►► NOW PRESS ENTER ◄◄◄"
-			: (BlinkDelay > 7) ? "▼ make your selection ▼"
-			: " ▲▲   type a number   ▲▲ "
-			GuiControl, % (BlinkCommit) ? rblink : yblink, bt%A_Index%
-		}
+HandleButton(Button, *) {
+	; Button.Name = variable name //// Button.Text = label
+	test:= SubStr(Button.Name, 1, 2) ; get first two characters of variable name
+	for control in myGui {
+		if SubStr(control.Name, 1, 2) == test
+			control.Enabled:= (control.Name == Button.Name) ? 0 : 1
 	}
-	SetTimer, Blink, % (toggle) ? "750" : "250"
-	return
-
-EditMod:
-	Gui, Submit, NoHide
-	BlinkCommit:= (DelayValue != "") ? 1 : 0
-	return
-
-EditScroll:
-	ControlSend,, % (etoggle:= !etoggle) ? "{End}" : "{Home}", ahk_id %hEDIT%
-	return
-
-ExitSub:
-	ExitApp
-	return
-
-FindToolHandler:
-	Dragging:= True
-	GuiControl,, FINDtl, %Bitmap2%
-	DllCall("SetCapture", Ptr, hSPE)
-	holdCursor:= DllCall("SetCursor", Ptr, hCrossHair)
-	return
-
-LVMod:
-	if (A_GuiControlEvent = "Normal") || (A_GuiControlEvent = "DoubleClick") {
-		LVrow:= A_EventInfo
-		LV_GetText(LVpid, LVrow)
-		LV_GetText(LVproc, LVrow, 2)
-		GuiControl,, DelayValue, %LVproc% (%LVpid%) ; @@@@@@@@@@@@@ EXE DelayValue @@@@@@@@@@@@@
-		Gui, Submit, NoHide
-		EditLen:= StrLen(DelayValue)
-		SetTimer, EditScroll, % (EditLen > 22) ? "1500" : "Off"
-		BlinkCommit:= 1
-	}
-	return
-
-ProcessList:
-	WTSEnumProcesses(), LV_Delete()
-	loop % arrLIST.MaxIndex() {
-		if (arrLIST[A_Index, "PID"] = 0)
-			Continue
-		LV_Add("", arrLIST[A_Index, "PID"], arrLIST[A_Index, "Process"])
-	}
-	LV_ModifyCol(1, "Integer AutoHdr Sort", "PID"), LV_ModifyCol(2, "AutoHdr Sort", "Process")
-	return
-
-ReloadSub:
-	reload
-	return
-
-WindowList:
-	/*
-		WinGet, WinList, List
-		loop % WinList {
-			WinGet, EXEname, ProcessName, % "ahk_id " . WinList%A_Index%
-			EXEname:= SubStr(EXEname, 1, StrLen(EXEname)-4)
-			WinGetTitle, WinTit, % "ahk_id " . WinList%A_Index%
-			if (WinTit = "")
-				Continue
-			LV_Add("", EXEname, WinTit)
-		}
-		LV_ModifyCol(2, "AutoHdr Sort", "Title"), LV_ModifyCol(1, "100 Sort", "Process")
-	*/
-	return
-
-
-;;;;;;;;;;;;;;;;;;;;
-;;; HOTKEYS
-;;;;;;;;;;;;;;;;;;;;
-
-x::Goto ExitSub
-Escape::Goto ReloadSub
-
-p::Msgbox % "DV @" . DelayValue . "@`nNT @" . NewText . "@" ; @@@ test line @@@
-
-r::
-t::
-z::
-	EVENT_TYPE:= A_ThisHotkey
-	BlinkEvent:= (EVENT_TYPE = "R") ? 1 : (EVENT_TYPE = "T") ? 2 : 3
-	SetTimer, Blink, 0
-	Loop, 3
-		GuiControl, % (BlinkEvent = A_Index) ? ytxt : ptxt, t%A_Index%
-	return
-
-s::
-m::
-h::
-d::
-e::
-w::
-	SetTimer, EditScroll, Off
-	GuiControl,, DelayValue ; erase edit control's contents
-	DELAY_TYPE:= A_ThisHotkey
-	BlinkDelay:= (DELAY_TYPE = "S") ? 4
-		: (DELAY_TYPE = "M") ? 5
-		: (DELAY_TYPE = "H") ? 6
-		: (DELAY_TYPE = "D") ? 7
-		: (DELAY_TYPE = "E") ? 8
-		: 9 ; DELAY_TYPE = W
-	GuiControl, % (BlinkDelay > 7) ? "Disable" : "Enable", DelayValue
-	SetTimer, Blink, 0
-	Loop, 6 {
-		lnum:= A_Index + 3
-		GuiControl, % (BlinkDelay = lnum) ? ytxt : ptxt, t%lnum%
-	}
-	GuiControl,, DelayTitle, % (BlinkDelay = 8) ? dtit . "AN EXE:" : (BlinkDelay = 9) ? dtit . "A WINDOW:" : dtit1
-	if (BlinkDelay > 7)
-		Gosub, % (BlinkDelay = 8) ? "ProcessList" : "WindowList" ; @@@@@@@@@@ GO SUBS @@@@@@@@@@
-	GuiControl, % (BlinkDelay = 8) ? "Show" : "Hide", EXElv
-	GuiControl, % (BlinkDelay = 9) ? "Show" : "Hide", FINDtl
-	GuiControl, % (BlinkDelay = 9) ? "Show" : "Hide", FINDtx
-	GuiControl, Focus, % (BlinkDelay = 8) ? "EXElv" : "DelayValue"
-	Gui Show, AutoSize Center
-	return
-
-Enter::
-NumpadEnter::
-	Gui Submit, NoHide
-	if (DelayValue = "")
-		return
-	if (BlinkDelay > 7) {
-		;fp3 (if delay is EXE or WINDOW)
-		; do something with DelayValue
-	}
-	else
-		DelayValue *= (DELAY_TYPE = "M") ? 60 : (DELAY_TYPE = "H") ? 3600 : (DELAY_TYPE = "D") ? 86400 : 1
-	Gui Destroy
-	Gui Color, Black, Black
-	Gui Font, Bold s12 cLime, Hermit
-	Gui Add, Text, y0 w320 Center, _________________________________
-	Gui Add, Text, cYellow, % EVENT:= (EVENT_TYPE = "R") ? "RESTART" : (EVENT_TYPE = "T") ? "SHUTDOWN" : "SLEEP"
-	Gui Add, Text, x+m, % (BlinkDelay > 7) ? "WHEN:" : "IN:"
-	Gui Add, Text, cPurple x+m vCounter, %DelayValue%
-	Gui Add, Text, x+m vseconds, % (BlinkDelay > 7) ? "CLOSES" : "SECONDS"
-	Gui Add, Text, xm y+-4 w320 Center, _________________________________
-	Gui Add, Button, Center x110 gReloadSub, Cancel?
-	Gui +Owner +LastFound -SysMenu -Caption
-		SendMessage, 0x80, 1, hIcon ; Call for blank icon
-	Gui Show, Autosize Center, % EVENT . " COUNTDOWN"
-	if (BlinkDelay = 8) {
-		; !ProcessExist(pidORname)
-	}
-	else if (BlinkDelay = 9) {
-		; WinWaitClose
-	}
-	else {
-		DelayValueTotal:= DelayValue
-		Loop % DelayValue {
-			GuiControl,, Counter, % DelayValue--
-			GuiControl, % (DelayValueTotal-A_Index+1 <= 10) ? rtxt : ptxt, Counter
-			Sleep 1000
-		}
-	}
-	Gui Destroy
-	; MsgBox BANG! ; @@@ test line @@@
-	; Goto, ReloadSub ; @@@ test line @@@
-	if (EVENT_TYPE = "Z")
-		DllCall("PowrProf\SetSuspendState", int, 0, int, 1, int, 0) ; force sleep
-	else
-		Shutdown, % (EVENT_TYPE = "T") ? (4+1) : (4+2) ; if T, force shutdown else force restart
-	ExitApp
-	return
-
-
-;;;;;;;;;;;;;;;;;;;;
-;;; FUNCTIONS
-;;;;;;;;;;;;;;;;;;;;
-
-OnWM_MOUSEMOVE(wParam, lParam, msg, hWnd) {
-	Static hOldWnd:= 0
-	If (Dragging) {
-		MsgBox howdy1
-		MouseGetPos x, y, hWin
-		g_hWnd:= hWin
-		If (g_hWnd != hOldWnd)
-			ShowBorder(g_hWnd)
-		hOldWnd:= g_hWnd
-	}
+    if test == "WT" {
+        if Button.Name == "WTP" {
+            myEDIT.Visible:= 0
+            myDT.Visible:= 1
+        } else {
+            myEDIT.Visible:= 1
+            myDT.Visible:= 0
+        }
+    }
+    focus:= myEDIT.Visible ? "EDIT" : "DT"
+	my%focus%.Focus()
 }
 
-OnWM_LBUTTONUP(wParam, lParam, msg, hWnd) {
-	If (Dragging) {
-		MsgBox howdy3
-		Dragging:= False
-		DllCall("ReleaseCapture")
-		DllCall("SetCursor", Ptr, hOldCursor)
-		GuiControl,, FINDtl, %Bitmap1%
-		Loop 4 {
-			Index:= A_Index + 90
-			Gui %Index%: Destroy
-		}
-		WinGetTitle, Title, ahk_id %g_hWnd%
-		WinGet PID, PID, ahk_id %g_hWnd%
-		MsgBox % Title . " (" . PID . ")"
-	}
+SetPowerPrivilege(*) {
+	PID:= ProcessExist() ; Sets PID of this running script
+	h:= DllCall("OpenProcess", "UInt", 0x0400, "Int", false, "UInt", PID, "Ptr")
+	DllCall("Advapi32.dll\OpenProcessToken", "Ptr", h, "UInt", 32, "Ptr*", &t:=0)
+	ti:= Buffer(16, 0)
+	NumPut("UInt", 1, ti, 0)  ; One entry in the privileges array
+	DllCall("Advapi32.dll\LookupPrivilegeValue", "Ptr", 0, "Str", "SeShutdownPrivilege", "Int64*", &luid:=0)
+	NumPut("Int64", luid, ti, 4)
+	NumPut("UInt", 2, ti, 12)  ; SE_PRIVILEGE_ENABLED = 2
+	DllCall("Advapi32.dll\AdjustTokenPrivileges", "Ptr", t, "Int", false, "Ptr", ti, "UInt", 0, "Ptr", 0, "Ptr", 0)
+	DllCall("CloseHandle", "Ptr", t)
+	DllCall("CloseHandle", "Ptr", h)
 }
 
-ProcessExist(pidORname) {
-	Process, Exist, %pidORname%
-	return ErrorLevel
+SubmitGui(*) {
+    myGui.Submit()
+    global AMOUNT:= myDT.Visible ? myDT.Value : (!myEDIT.Value ? 0 : myEDIT.Value) ; set to DT or EDIT (and if EDIT blank, set to 0)
+	for control in myGui {
+        test:= SubStr(control.Name, 1, 2) ; get first two characters of variable name
+		if (test == "PS") && !control.Enabled {
+			global COMMAND:= SubStr(control.Name, -1) ; set to last digit of control's name
+            PowerState:= StrReplace(control.Text, "&")
+        }
+		if (test == "WT") && !control.Enabled
+			global UnitType:= SubStr(control.Name, 3) ; set to last digits of control's name
+	}
+    global Milliseconds
+    if (UnitType == "P")
+        Milliseconds:= DateDiff(AMOUNT, A_Now, "Seconds") * 1000
+    else
+        Milliseconds:= AMOUNT * UnitType ; total wait time in milliseconds
+    if (Milliseconds < 1) { ; if wait is 0 or negative, immediately initiate
+        InitiatePowerAction(COMMAND)
+        Return
+    }
+
+    ; Create Countdown GUI
+    myGui2:= Gui("+AlwaysOnTop +Border +ToolWindow", "OS will " PowerState " in:")
+    myGui2.BackColor:= "Black"
+    myGui2.SetFont("Bold cRed")
+    myGui2.OnEvent("Close", (*) => ExitApp())
+    myGui2.OnEvent("Escape", (*) => ExitApp())
+    myGui2.AddText(, "DAYS       HOURS       MINUTES       SECONDS")
+    myGui2.AddText("x52 yp", ":")
+    myGui2.AddText("x118 yp", ":")
+    myGui2.AddText("x194 yp", ":")
+    myGui2.AddText("x52 y+2", ":")
+    myGui2.AddText("x118 yp", ":")
+    myGui2.AddText("x194 yp", ":")
+    global myDays:= myGui2.AddText("x21 yp", "00")
+    global myHours:= myGui2.AddText("x81 yp", "00")
+    global myMinutes:= myGui2.AddText("x152 yp", "00")
+    global mySeconds:= myGui2.AddText("x230 yp", "00")
+    myGui2.AddButton("xs y+7 w75 Center Default", "&Edit").OnEvent("Click", (*) => Reload())
+    myGui2.AddButton("xp+180 yp w75 Center", "&CANCEL").OnEvent("Click", (*) => ExitApp())
+    myGui2.Show()
+
+    ; Begin Timers
+    CountdownTimer() ; immediately execute timer so no awkwardness
+    SetTimer(CountdownTimer, 1000)
 }
 
-ShowBorder(hWnd, Color:= "0x3FBBE3", r:= 3) {
-	Local wx, wy, ww, wh, x, y, w, h, Index
-	MsgBox howdy2
-	WinGetPos wx, wy, ww, wh, ahk_id %hWnd%
-	If (!ww) {
-		Return
-	}
-	x:= wx, y:= wy, w:= ww, h:= wh
-	Loop 4 {
-		Index:= A_Index + 90
-		Gui %Index%: +AlwaysOnTop -Caption +ToolWindow
-		Gui %Index%: Color, %Color%
-	}
-	Gui 91: Show, % "NA x" (x - r) " y" (y - r) " w" (w + r + r) " h" r
-	Gui 92: Show, % "NA x" (x - r) " y" (y + h) " w" (w + r + r) " h" r
-	Gui 93: Show, % "NA x" (x - r) " y" y " w" r " h" h
-	Gui 94: Show, % "NA x" (x + w) " y" y " w" r " h" h
+
+CountdownTimer(*) {
+    global Milliseconds, myDays, myHours, myMinutes, mySeconds
+    if (Milliseconds < 1) {
+        InitiatePowerAction(COMMAND)
+        Return
+    }
+
+    ; Calc and display time components
+    RemainingMs:= Milliseconds
+    myDays.Text:= Format("{:02}", Floor(RemainingMs // 86400000))
+    RemainingMs-= myDays.Text * 86400000
+    myHours.Text:= Format("{:02}", Floor(RemainingMs // 3600000))
+    RemainingMs-= myHours.Text * 3600000
+    myMinutes.Text:= Format("{:02}", Floor(RemainingMs // 60000))
+    RemainingMs-= myMinutes.Text * 60000
+    mySeconds.Text:= Format("{:02}", Floor(RemainingMs // 1000))
+
+    Milliseconds -= 1000
 }
 
-WTSEnumProcesses() { ; By SKAN modified by jNizM  
-	local tPtr:=pPtr:=nTTL:= 0, LIST:= ""
-	hModule:= DllCall("kernel32.dll\LoadLibrary", "Str", "wtsapi32.dll", "Ptr")
-	if !(DllCall("wtsapi32.dll\WTSEnumerateProcesses", "Ptr", 0, "UInt", 0, "UInt", 1, "Ptr*", pPtr, "UInt*", nTTL))
-		return "", DllCall("kernel32.dll\SetLastError", "UInt", -1)
-	tPtr:= pPtr, arrLIST:= []
-	loop % (nTTL) {
-		arrLIST[A_Index, "PID"]     := NumGet(tPtr + 4, "UInt")    ; ProcessId (PID)
-		arrLIST[A_Index, "Process"] := StrGet(NumGet(tPtr + 8))    ; ProcessName
-		tPtr += (A_PtrSize = 4 ? 16 : 24)                          ; sizeof(WTS_PROCESS_INFO)
-	}
-	DllCall("wtsapi32.dll\WTSFreeMemory", "Ptr", pPtr)
-	if (hModule)
-		DllCall("kernel32.dll\FreeLibrary", "Ptr", hModule)
-	return arrLIST, DllCall("kernel32.dll\SetLastError", "UInt", nTTL)
-} ; https://www.autohotkey.com/boards/viewtopic.php?f=6&t=4365#p44554
+
+InitiatePowerAction(COMMAND) {
+    ; Call ZwInitiatePowerAction (MUST enable SeShutdownPrivilege BEFORE this call)
+    ; COMMAND Action type: 1=Shutdown, 2=StandbyS3/Sleep, 3=Hibernate, 4=Reboot/Restart
+    DllCall("ntdll\ZwInitiatePowerAction", "int", COMMAND, "int", 4, "int", 0x80000000, "int", 1)
+    ExitApp
+}
