@@ -19,13 +19,12 @@ myGui.AddButton("vPS2 xs+10 ys+20 w55 Center Disabled", "&SLEEP").OnEvent("Click
 myGui.AddButton("vPS1 xp+65 yp w85 Center", "SH&UTDOWN").OnEvent("Click", HandleButton)
 myGui.AddButton("vPS4 xp+95 yp w70 Center", "&RESTART").OnEvent("Click", HandleButton)
 
-myGui.AddGroupBox("Section xs w250 h150", "Wait Type:")
+myGui.AddGroupBox("Section xs w250 h118", "Wait Type:")
 myGui.AddButton("vWT1000 xs+40 ys+20 w80 Center Disabled", "S&econds").OnEvent("Click", HandleButton)
 myGui.AddButton("vWT60000 xp+90 yp w80 Center", "&Minutes").OnEvent("Click", HandleButton)
 myGui.AddButton("vWT3600000 xs+40 yp+32 w80 Center", "&Hours").OnEvent("Click", HandleButton)
 myGui.AddButton("vWT86400000 xp+90 yp w80 Center", "&Days").OnEvent("Click", HandleButton)
 myGui.AddButton("vWTP xs+40 yp+32 w170 Center", "&PARTICULAR  DATE-TIME").OnEvent("Click", HandleButton)
-;myGui.AddButton("vWTX xs+40 yp+32 w170 Center", "E&XE / HWND  CLOSURE").OnEvent("Click", HandleButton)
 
 myGui.AddGroupBox("Section xs w250 h55", "Wait Amount:")
 myEDIT:= myGui.AddEdit("vWA1 xs+40 ys+20 w170 Center Number")
