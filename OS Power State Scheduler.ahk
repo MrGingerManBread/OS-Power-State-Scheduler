@@ -19,12 +19,13 @@ myGui.AddButton("vPS2 xs+10 ys+20 w55 Center Disabled", "&SLEEP").OnEvent("Click
 myGui.AddButton("vPS1 xp+65 yp w85 Center", "SH&UTDOWN").OnEvent("Click", HandleButton)
 myGui.AddButton("vPS4 xp+95 yp w70 Center", "&RESTART").OnEvent("Click", HandleButton)
 
-myGui.AddGroupBox("Section xs w250 h118", "Wait Type:")
+myGui.AddGroupBox("Section xs w250 h150", "Wait Type:")
 myGui.AddButton("vWT1000 xs+40 ys+20 w80 Center Disabled", "S&econds").OnEvent("Click", HandleButton)
 myGui.AddButton("vWT60000 xp+90 yp w80 Center", "&Minutes").OnEvent("Click", HandleButton)
 myGui.AddButton("vWT3600000 xs+40 yp+32 w80 Center", "&Hours").OnEvent("Click", HandleButton)
 myGui.AddButton("vWT86400000 xp+90 yp w80 Center", "&Days").OnEvent("Click", HandleButton)
 myGui.AddButton("vWTP xs+40 yp+32 w170 Center", "&PARTICULAR  DATE-TIME").OnEvent("Click", HandleButton)
+;myGui.AddButton("vWTX xs+40 yp+32 w170 Center", "E&XE / HWND  CLOSURE").OnEvent("Click", HandleButton)
 
 myGui.AddGroupBox("Section xs w250 h55", "Wait Amount:")
 myEDIT:= myGui.AddEdit("vWA1 xs+40 ys+20 w170 Center Number")
@@ -43,28 +44,29 @@ HandleButton(Button, *) {
 	test:= SubStr(Button.Name, 1, 2) ; get first two characters of variable name
 	for control in myGui {
 		if SubStr(control.Name, 1, 2) == test
-			control.Enabled:= (control.Name == Button.Name) ? 0 : 1
+			control.Enabled:= (control.Name == Button.Name) ? 0 : 1 ; toggle all buttons in same section
 	}
-    if test == "WT" {
-        if Button.Name == "WTP" {
-            myEDIT.Visible:= 0
-            myDT.Visible:= 1
-        } else {
-            myEDIT.Visible:= 1
-            myDT.Visible:= 0
-        }
-    }
-    focus:= myEDIT.Visible ? "EDIT" : "DT"
-	my%focus%.Focus()
+	if (test == "WT") {
+		if (Button.Name == "WTP") {
+			myDT.Value:= A_Now
+			myEDIT.Visible:= 0
+			myDT.Visible:= 1
+		} else {
+			myEDIT.Visible:= 1
+			myDT.Visible:= 0
+		}
+	}
+	foc:= myEDIT.Visible ? "EDIT" : "DT"
+	my%foc%.Focus()
 }
 
 SetPowerPrivilege(*) {
 	PID:= ProcessExist() ; Sets PID of this running script
 	h:= DllCall("OpenProcess", "UInt", 0x0400, "Int", false, "UInt", PID, "Ptr")
-	DllCall("Advapi32.dll\OpenProcessToken", "Ptr", h, "UInt", 32, "Ptr*", &t:=0)
+	DllCall("Advapi32.dll\OpenProcessToken", "Ptr", h, "UInt", 32, "Ptr*", &t:= 0)
 	ti:= Buffer(16, 0)
 	NumPut("UInt", 1, ti, 0)  ; One entry in the privileges array
-	DllCall("Advapi32.dll\LookupPrivilegeValue", "Ptr", 0, "Str", "SeShutdownPrivilege", "Int64*", &luid:=0)
+	DllCall("Advapi32.dll\LookupPrivilegeValue", "Ptr", 0, "Str", "SeShutdownPrivilege", "Int64*", &luid:= 0)
 	NumPut("Int64", luid, ti, 4)
 	NumPut("UInt", 2, ti, 12)  ; SE_PRIVILEGE_ENABLED = 2
 	DllCall("Advapi32.dll\AdjustTokenPrivileges", "Ptr", t, "Int", false, "Ptr", ti, "UInt", 0, "Ptr", 0, "Ptr", 0)
